@@ -1,0 +1,96 @@
+html,
+body {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+  background: #020617;
+  color: #f9fafb;
+  font-family: 'Inter', 'Segoe UI', Arial, sans-serif;
+}
+
+#root {
+  min-height: 100vh;
+}
+
+
+.ant-card-head{
+  border-bottom: none !important;
+}
+
+.ant-pagination-prev .ant-pagination-item-link,
+.ant-pagination-next .ant-pagination-item-link {
+  color: #fff !important;
+  background: none !important;
+}
+.ant-pagination-prev .ant-pagination-item-link:hover,
+.ant-pagination-next .ant-pagination-item-link:hover {
+  background: #252529 !important;
+}
+
+.ant-pagination .ant-pagination-item{
+  border-radius: 100%;
+}
+.ant-pagination .ant-pagination-item a:hover{
+  background: #ddd;
+  border-radius: 100%;
+}
+.ant-pagination .ant-pagination-item-active a {
+  color: black;
+  background: #D1FC5B !important;
+  border-radius: 100%;
+  overflow: hidden;
+}
+
+
+
+
+.ant-select-dropdown.ant-select-dropdown-placement-bottomLeft,
+.ant-select-dropdown.ant-select-dropdown-placement-topLeft {
+  background: #586a26 !important;
+}
+
+
+.user-table-gray-row-border .ant-table-tbody > tr > td {
+  border-bottom: 1px solid #383838 !important;
+}
+.ant-btn.ant-btn-color-primary.ant-btn-variant-solid {
+  color: black;
+}
+.ant-btn.ant-btn-color-primary.ant-btn-variant-solid:hover, 
+.ant-btn.ant-btn-color-primary.ant-btn-variant-solid:focus {
+  color: black;
+}
+
+/* For ant-btn-default ant-btn-color-default ant-btn-variant-outlined */
+.ant-btn.ant-btn-default.ant-btn-color-default.ant-btn-variant-outlined {
+  color: black;
+}
+.ant-btn.ant-btn-default.ant-btn-color-default.ant-btn-variant-outlined:hover, 
+.ant-btn.ant-btn-default.ant-btn-color-default.ant-btn-variant-outlined:focus {
+  color: black;
+}
+
+/* For ant-btn with css-dev-only-do-not-override-xbngoj and css-var-_r_0_ */
+.ant-btn.css-dev-only-do-not-override-xbngoj.css-var-_r_0_ {
+  color: black;
+}
+.ant-btn.css-dev-only-do-not-override-xbngoj.css-var-_r_0_:hover, 
+.ant-btn.css-dev-only-do-not-override-xbngoj.css-var-_r_0_:focus {
+  color: black;
+}
+.ant-modal-close-icon{
+  color: white ;
+}
+.ant-typography {
+  color: #fff !important;
+}
+.ant-descriptions-item-label{
+  color: #ffff !important;
+}
+.user-table-gray-row-border .ant-table-tbody > tr > td{
+  color: #ffff;
+}
+
+.ant-select-dropdown.ant-select-dropdown-placement-topRight {
+  background: #586a26 !important;
+}
