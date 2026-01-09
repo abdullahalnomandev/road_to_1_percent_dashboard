@@ -465,22 +465,29 @@ const DashboardLayout: React.FC = () => {
               }}
             >
               <div
-                style={{ cursor: "pointer", display: "flex", alignItems: "center", gap: 8 }}
+                style={{
+                  cursor: "pointer",
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 8,
+                }}
                 onClick={() => navigate("/profile")}
               >
                 <Avatar
                   src={
-                    profile?.data?.profileImage?.startsWith("http")
-                      ? profile.data.profileImage
-                      : `${imageUrl}/${profile.data.profileImage}`
+                    profile?.data?.image
+                      ? profile.data.image.startsWith("http")
+                        ? profile.data.image
+                        : `${imageUrl}/${profile.data.image}`
+                      : undefined
                   }
                 />
                 <Text style={{ color: "#f9fafb", fontWeight: 500 }}>
                   {profile?.data?.name}
                 </Text>
               </div>
-              </div>
             </div>
+          </div>
         </Header>
         {/* Main Content Padding for fixed header */}
         <Content

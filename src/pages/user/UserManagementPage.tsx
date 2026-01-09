@@ -15,6 +15,7 @@ import type { TableColumnsType, TablePaginationConfig } from "antd";
 import { FiSearch } from "react-icons/fi";
 import { EyeOutlined } from "@ant-design/icons";
 import { useGetUsersQuery } from "../../redux/apiSlices/userSlice";
+import { imageUrl } from "../../redux/api/baseApi";
 
 const { Text } = Typography;
 
@@ -175,7 +176,16 @@ const columns: TableColumnsType<User> = [
     width: 180,
     render: (_: string, record: User) => (
       <span style={{ display: "flex", alignItems: "center", gap: 10 }}>
-        <Avatar src={record.image} size={36} />
+        <Avatar
+          src={
+            record.image
+              ? record.image.startsWith("http")
+                ? record.image
+                : `${imageUrl}/${record.image}`
+              : undefined
+          }
+          size={36}
+        />
         <span>
           <Text style={{ color: "#f9fafb" }}>{record.name}</Text>
         </span>
@@ -249,10 +259,12 @@ const columns: TableColumnsType<User> = [
       <Text style={{ color: "#d4d4d8", fontSize: 12 }}>
         {(() => {
           const date = new Date(value);
-          return `${date.getDate().toString().padStart(2, "0")} ${date.toLocaleString(
-            "en-US",
-            { month: "short" }
-          )} ${date.getFullYear()}`;
+          return `${date
+            .getDate()
+            .toString()
+            .padStart(2, "0")} ${date.toLocaleString("en-US", {
+            month: "short",
+          })} ${date.getFullYear()}`;
         })()}
       </Text>
     ),
