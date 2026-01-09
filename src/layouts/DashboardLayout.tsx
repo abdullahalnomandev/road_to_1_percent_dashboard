@@ -470,7 +470,7 @@ const DashboardLayout: React.FC = () => {
               >
                 <Avatar
                   src={
-                    profile.data.profileImage.startsWith("http")
+                    profile?.data?.profileImage?.startsWith("http")
                       ? profile.data.profileImage
                       : `${imageUrl}/${profile.data.profileImage}`
                   }
@@ -479,8 +479,8 @@ const DashboardLayout: React.FC = () => {
                   {profile?.data?.name}
                 </Text>
               </div>
+              </div>
             </div>
-          </div>
         </Header>
         {/* Main Content Padding for fixed header */}
         <Content
