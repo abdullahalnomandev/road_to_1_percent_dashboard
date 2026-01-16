@@ -3,7 +3,6 @@ import {
   Table,
   Typography,
   Button,
-  Spin,
   message,
   Space,
   Popconfirm,
@@ -208,7 +207,6 @@ const Meal: React.FC<IProps> = ({
       />
 
       {/* Table */}
-      <Spin spinning={isLoading}>
         <Table
           rowKey="_id"
           style={{ overflowX: "auto", marginTop: 20 }}
@@ -223,7 +221,6 @@ const Meal: React.FC<IProps> = ({
               : { y: `calc(100vh - 320px)` }
           }
         />
-      </Spin>
     </div>
   );
 };

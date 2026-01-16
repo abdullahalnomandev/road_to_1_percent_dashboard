@@ -94,3 +94,10 @@ body {
 .ant-select-dropdown.ant-select-dropdown-placement-topRight {
   background: #586a26 !important;
 }
+
+
+.jodit-popup,
+.jodit-modal,
+.jodit-dialog {
+  z-index: 2000 !important;
+}

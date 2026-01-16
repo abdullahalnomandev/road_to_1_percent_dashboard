@@ -9,8 +9,8 @@ import {
   Card,
   Space,
 } from "antd";
-import { useEffect, useState } from "react";
-import Editor from "react-simple-wysiwyg";
+import { useEffect, useRef, useMemo, useState } from "react";
+import JoditEditor from "jodit-react";
 import {
   UploadOutlined,
   InboxOutlined,
@@ -46,38 +46,62 @@ export const GymAndFitnessPlanCreateModal: React.FC<{
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [imagePreview, setImagePreview] = useState<string>("");
   const [fileList, setFileList] = useState<UploadFile[]>([]);
-  const [descError, setDescError] = useState<string>("");
+  const [imageError, setImageError] = useState<string>(""); // <-- for image error message
 
-  // Use single html state for editor, will save html to db
-  const [html, setHtml] = useState<string>("");
+  // Jodit Editor logic --- useRef for value, not state!
+  const editor = useRef(null);
+  const isMobile = typeof window !== "undefined" && window.innerWidth <= 600;
+  const editorHeight = isMobile ? 200 : 300;
 
-  // Correct e typing
-  function onChange(e: React.ChangeEvent<HTMLTextAreaElement> | string) {
-    // react-simple-wysiwyg actually calls onChange(newHtml: string)
-    if (typeof e === "string") {
-      setHtml(e);
-    } else {
-      setHtml(e.target.value);
-    }
-  }
+  // Use ref for description
+  const editorContentRef = useRef<string>(editPlan?.description || "");
+  
+  const joditConfig = useMemo(
+    () => ({
+      readonly: false,
+      height: 240, // higher for more space, matches "BusinessAndMindSetPlanCreateModal"
+      minHeight: 240,
+      theme: "default",
+      buttons:
+      "undo,redo,|," +
+      "font,fontsize,|," +
+      "brush,|," +
+      "bold,italic,underline,strikethrough,|," +
+      "ul,ol,|," +
+      "lineHeight,|," ,
+      placeholder: "Write Description",
+      toolbarAdaptive: false,
+      style: { background: "#131313", color: "#fff", minHeight: 240 },
+      toolbarSticky: false,
+      allowResizeY: false,
+      spellcheck: true,
+      statusbar: false,
+      // Custom CSS for the editor (matches high-contrast look of Biz modal)
+      uploader: { insertImageAsBase64URI: false },    
+    }),
+    [editorHeight]
+  );
+  
+  
 
   useEffect(() => {
     if (editPlan) {
       form.setFieldsValue({
         title: editPlan.title,
       });
-      setHtml(editPlan.description || ""); // Restore HTML from db
+      editorContentRef.current = editPlan.description || "";
       setImageFile(null);
       setFileList([]);
       setImagePreview(editPlan.image ? `${imageUrl}/${editPlan.image}` : "");
+      setImageError("");
     } else {
       form.resetFields();
-      setHtml("");
+      editorContentRef.current = "";
       setImageFile(null);
       setFileList([]);
       setImagePreview("");
+      setImageError("");
     }
-    setDescError("");
   }, [editPlan, form, open]);
 
   const handleImageChange = (info: any) => {
@@ -89,19 +113,24 @@ export const GymAndFitnessPlanCreateModal: React.FC<{
 
       const isImage = originFile.type && originFile.type.startsWith("image/");
       if (!isImage) {
-        message.error("Please upload a valid image file!");
+        setImageError("Please upload a valid image file!");
         setFileList([]);
+        setImageFile(null);
+        setImagePreview(editPlan?.image ? `${imageUrl}/${editPlan?.image}` : "");
         return;
       }
 
       const isLt5M = originFile.size / 1024 / 1024 < 5;
       if (!isLt5M) {
-        message.error("Image must be smaller than 5MB!");
+        setImageError("Image must be smaller than 5MB!");
         setFileList([]);
+        setImageFile(null);
+        setImagePreview(editPlan?.image ? `${imageUrl}/${editPlan?.image}` : "");
         return;
       }
 
       setImageFile(originFile);
+      setImageError("");
 
       const reader = new FileReader();
       reader.onloadend = () => {
@@ -118,48 +147,80 @@ export const GymAndFitnessPlanCreateModal: React.FC<{
     setImageFile(null);
     setFileList([]);
     setImagePreview(editPlan?.image ? `${imageUrl}/${editPlan?.image}` : "");
+    setImageError("Image is required."); // Set error if removed
     message.info("Image removed");
+  };
+
+  const handleEditorChange = (newContent: string) => {
+    editorContentRef.current = newContent;
+    // No setState for html, just update ref
   };
 
   const handleSubmit = async () => {
     try {
       const values = await form.validateFields();
 
-      // Remove html tags for empty content check only
-      const cleanDesc = html.replace(/<[^>]*>/g, "").trim();
-      if (!cleanDesc) {
-        setDescError("Please enter plan description");
+      // Image is required for new, and must be present for edit (either file or preview from editPlan)
+      if ((!imageFile && (!editPlan || !editPlan.image))) {
+        setImageError("Image is required.");
+        // Also scroll to image section for user feedback
+        document.getElementById("plan-image-field")?.scrollIntoView({ behavior: "smooth", block: "center" });
         return;
+      } else {
+        setImageError("");
       }
-      setDescError("");
 
       const formData = new FormData();
       formData.append("title", values.title);
-      formData.append("description", html); // Save html as desc to db
+      formData.append("description", editorContentRef.current || ""); // Save html as desc to db
 
       if (imageFile) {
         formData.append("image", imageFile);
-      } else if (!editPlan) {
+      } else if (editPlan && editPlan.image) {
+        // No new file, but keep existing image
+        formData.append("image", editPlan.image);
+      } else {
         formData.append("image", "");
       }
 
-      if (editPlan) {
-        await onUpdate(editPlan._id, formData);
-      } else {
-        await onAdd(formData);
+      try {
+        if (editPlan) {
+          await onUpdate(editPlan._id, formData);
+        } else {
+          await onAdd(formData);
+        }
+      } catch (error: any) {
+        // Show error message on failure
+        console.log(error);
+        // Handle Mongoose validation error for image
+        if (
+          error &&
+          error.success === false &&
+          Array.isArray(error.errorMessages)
+        ) {
+          // Look for the "image" path error
+          const imgError = error.errorMessages.find(
+            (msg: any) => msg.path === "image"
+          );
+          if (imgError) {
+            setImageError(imgError.message || "Image is required.");
+            return;
+          }
+        }
+        message.error(error?.message || error || "Failed to save plan. Please try again.");
+        return;
       }
 
       form.resetFields();
-      setHtml("");
+      editorContentRef.current = "";
       setImageFile(null);
       setFileList([]);
       setImagePreview("");
-      setDescError("");
+      setImageError("");
     } catch (err) {
       console.error(err);
     }
   };
-
   return (
     <Modal
       open={open}
@@ -205,8 +266,13 @@ export const GymAndFitnessPlanCreateModal: React.FC<{
         {/* Image Upload Section */}
         <Form.Item
           label={
-            <span style={{ fontSize: 14, fontWeight: 500 }}>Image</span>
+            <span style={{ fontSize: 14, fontWeight: 500 }}>Image<span style={{ color: "#ff3333" }}> *</span></span>
           }
+          required
+          style={{ marginBottom: imageError ? 4 : 24 }}
+          validateStatus={imageError ? "error" : undefined}
+          help={imageError || undefined}
+          id="plan-image-field"
         >
           {!imagePreview ? (
             <Dragger
@@ -220,9 +286,9 @@ export const GymAndFitnessPlanCreateModal: React.FC<{
               showUploadList={false}
               style={{
                 borderRadius: 12,
-                border: "2px dashed #d9d9d9",
+                border: imageError ? "2px dashed #ff3333" : "2px dashed #d9d9d9",
                 transition: "all 0.3s",
-                height: 200, // Match the image Preview height
+                height: 200,
                 display: "flex",
                 alignItems: "center",
                 justifyContent: "center"
@@ -232,7 +298,7 @@ export const GymAndFitnessPlanCreateModal: React.FC<{
                 <div style={{ display: 'flex', height: 200, alignItems: 'center', justifyContent: 'center' }}>
                   <div>
                     <p className="ant-upload-drag-icon" style={{ textAlign: "center" }}>
-                      <InboxOutlined style={{ fontSize: 56, color: "#1890ff" }} />
+                      <InboxOutlined style={{ fontSize: 56, color: imageError ? "#ff3333" : "#1890ff" }} />
                     </p>
                     <p
                       style={{
@@ -265,9 +331,10 @@ export const GymAndFitnessPlanCreateModal: React.FC<{
               style={{
                 borderRadius: 12,
                 background: "black",
-                height: 200, // Match the image Preview height
+                height: 200,
                 display: "flex",
                 alignItems: "stretch",
+                border: imageError ? "1.5px solid #ff3333" : undefined,
               }}
               bodyStyle={{
                 height: "100%",
@@ -324,8 +391,6 @@ export const GymAndFitnessPlanCreateModal: React.FC<{
                 {/* Image Info & Actions */}
                 <div style={{ flex: 1, height: "100%", display: "flex", flexDirection: "column", justifyContent: "center" }}>
                   <Space direction="vertical" size={16} style={{ width: "100%" }}>
-              
-
                     {imageFile && (
                       <div>
                         <div
@@ -397,34 +462,27 @@ export const GymAndFitnessPlanCreateModal: React.FC<{
         <Form.Item
           label={
             <span style={{ fontSize: 14, fontWeight: 500 }}>
-               Description
+              Description
             </span>
           }
-          required
-          validateStatus={descError ? "error" : ""}
-          help={
-            descError && <span style={{ color: "#ff4d4f" }}>{descError}</span>
-          }
+          // Description is not required
         >
           <div
             style={{
-              border: descError ? "2px solid #ff4d4f" : "1px solid #d9d9d9",
+              border: "1px solid #d9d9d9",
               borderRadius: 8,
               overflow: "hidden",
               transition: "all 0.3s",
+              background: "#181c1f",
             }}
           >
-            <Editor
-              value={html}
-              onChange={(event) => onChange(event.target.value)}
-              aria-multiline
-              color="red"
-              style={{ color: "#fff", minHeight: 200, height: 200 }}
-              placeholder="Write Description"
+            <JoditEditor
+              ref={editor}
+              value={editorContentRef.current}
+              config={joditConfig as any}
+              tabIndex={1}
+              onChange={handleEditorChange}
             />
-          </div>
-          <div style={{ marginTop: 8, fontSize: 12, color: "#8c8c8c" }}>
-            💡 Tip: Use formatting tools to make your description more readable
           </div>
         </Form.Item>
       </Form>

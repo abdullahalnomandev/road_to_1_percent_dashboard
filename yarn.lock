@@ -3719,6 +3719,18 @@ isexe@^2.0.0:
   resolved "https://registry.yarnpkg.com/isexe/-/isexe-2.0.0.tgz#e8fbf374dc556ff8947a10dcb0572d633f2cfa10"
   integrity sha512-RHxMLp9lnKHGHRng9QFhRCMbYAcVpn69smSGcq3f36xjgVVWThj4qqLbTLlq7Ssj8B+fIQ1EuCEGI2lKsyQeIw==
 
+jodit-react@^5.2.38:
+  version "5.2.38"
+  resolved "https://registry.yarnpkg.com/jodit-react/-/jodit-react-5.2.38.tgz#a873b967d7c293374af60730761c544e7ad66d52"
+  integrity sha512-k98vjch0JWX13Dlf7tWv3wPo6dgO9bpi0NUBC6YrpGLYtRJx8d5Ttz5TLWuydEReedWWyNKobSGIGYQDihP8Vw==
+  dependencies:
+    jodit "^4.7.9"
+
+jodit@^4.7.9:
+  version "4.7.9"
+  resolved "https://registry.yarnpkg.com/jodit/-/jodit-4.7.9.tgz#168581750fffbbc34cddba72eeb08d911531ad34"
+  integrity sha512-dPlewnu2+vVXELh9BEJTNQoSBL3Cf2E0fNh30yjSEgUtJHYSUYToDjMDEqr0T/L9iNpqPTODy2b4pzyGpPRUog==
+
 "js-tokens@^3.0.0 || ^4.0.0", js-tokens@^4.0.0:
   version "4.0.0"
   resolved "https://registry.yarnpkg.com/js-tokens/-/js-tokens-4.0.0.tgz#19203fb59991df98e3a287050d4647cdeaf32499"

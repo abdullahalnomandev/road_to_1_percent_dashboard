@@ -5,7 +5,6 @@ import {
   Typography,
   Input,
   Button,
-  Spin,
   message,
   Space,
   Popconfirm,
@@ -253,7 +252,6 @@ const GymAndFitness: React.FC = () => {
       </div>
 
       {/* Table */}
-      <Spin spinning={isLoading}>
         <Table
           rowKey="_id"
           style={{ overflowX: "auto", marginTop: 20 }}
@@ -266,7 +264,6 @@ const GymAndFitness: React.FC = () => {
             window.innerWidth < 600 ? undefined : { y: `calc(100vh - 320px)` }
           }
         />
-      </Spin>
     </div>
   );
 };

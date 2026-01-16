@@ -3,7 +3,6 @@ import {
   Table,
   Typography,
   Button,
-  Spin,
   message,
   Space,
   Popconfirm,
@@ -205,7 +204,6 @@ const MealCategory: React.FC<IProps> = ({ editItem, setEditItem, formOpen, setFo
 
      
       {/* Table */}
-      <Spin spinning={isLoading}>
         <Table
           rowKey="_id"
           style={{ overflowX: "auto", marginTop: 20 }}
@@ -220,7 +218,6 @@ const MealCategory: React.FC<IProps> = ({ editItem, setEditItem, formOpen, setFo
               : { y: `calc(100vh - 320px)` }
           }
         />
-      </Spin>
     </div>
   );
 };

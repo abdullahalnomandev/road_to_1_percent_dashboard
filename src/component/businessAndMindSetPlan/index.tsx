@@ -1,10 +1,9 @@
-import React, { useMemo, useState } from "react";
+import React, { useMemo, useState, useRef, useEffect } from "react";
 import {
   Table,
   Typography,
   Input,
   Button,
-  Spin,
   message,
   Space,
   Popconfirm,
@@ -41,7 +40,10 @@ const BusinessAndMindSetPlan: React.FC = () => {
   const [limit, setLimit] = useState(10);
 
   const [viewItem, setViewItem] = useState<BusinessAndMindSetPlan | null>(null);
+
+  // New: split editItem and actual id to fetch, control fetch lifecycle better
   const [editItem, setEditItem] = useState<BusinessAndMindSetPlan | null>(null);
+  const prevEditIdRef = useRef<string | null>(null);
 
   const [viewOpen, setViewOpen] = useState(false);
   const [formOpen, setFormOpen] = useState(false);
@@ -55,15 +57,15 @@ const BusinessAndMindSetPlan: React.FC = () => {
   const [updateBusinessAndMindsetPlan, { isLoading: updateLoading }] = useUpdateBusinessAndMindsetPlanMutation();
   const [deleteBusinessAndMindsetPlan, { isLoading: deleteLoading }] = useDeleteBusinessAndMindsetPlanMutation();
 
-  // When viewing details, fetch from API by id
-  const {  data: details,} = useGetBusinessAndMindsetPlanDetailsQuery(
+  // View details fetch
+  const { data: details } = useGetBusinessAndMindsetPlanDetailsQuery(
     viewOpen && viewItem?._id ? viewItem._id : "",
     {
       skip: !viewOpen || !viewItem,
     }
   );
 
-  // For edit modal, fetch the details when form is open and an item is being edited
+  // Edit details fetch: always use the latest editItem id only when opening the modal
   const {
     data: editDetails,
     isLoading: editDetailsLoading,
@@ -73,6 +75,19 @@ const BusinessAndMindSetPlan: React.FC = () => {
       skip: !formOpen || !editItem,
     }
   );
+
+  // This effect clears out old edit data if editItem.id changes (or modal opens on new item)
+  useEffect(() => {
+    if (formOpen) {
+      if (editItem?._id !== prevEditIdRef.current) {
+        // Smoothly force the edit modal to remount with correct info; clear previous data
+        prevEditIdRef.current = editItem?._id || null;
+      }
+    }
+    if (!formOpen) {
+      prevEditIdRef.current = null;
+    }
+  }, [formOpen, editItem?._id]);
 
   const columns: TableColumnsType<BusinessAndMindSetPlan> = useMemo(
     () => [
@@ -99,7 +114,7 @@ const BusinessAndMindSetPlan: React.FC = () => {
                 onClick={() => {
                   setViewItem(record);
                   setViewOpen(true);
-                  refetch()
+                  refetch();
                 }}
               >
                 <EyeOutlined />
@@ -111,8 +126,13 @@ const BusinessAndMindSetPlan: React.FC = () => {
                 type="link"
                 style={{ color: "#586A26" }}
                 onClick={() => {
-                  setEditItem(record);
-                  setFormOpen(true);
+                  // Always set the currently clicked record as editItem,
+                  // and reset the formOpen to force modal fresh mount
+                  setEditItem(null); // Clear previous to kill lingering state
+                  setTimeout(() => {
+                    setEditItem(record);
+                    setFormOpen(true);
+                  }, 32); // short delay to ensure modal remount
                 }}
               >
                 <FiEdit />
@@ -154,15 +174,15 @@ const BusinessAndMindSetPlan: React.FC = () => {
       {/* Modals */}
       <GymAndFitnessPlanInfoModal
         open={viewOpen}
-        // Always supply the API-fetched details for view
         plan={details?.data || null}
         onClose={() => {
-          setEditItem(null);
+          setViewOpen(false);
           setViewItem(null);
-          return setViewOpen(false)
+          setEditItem(null);
         }}
       />
       <GymAndFitnessPlanCreateModal
+        key={editItem?._id || (formOpen ? "new" : "closed")}
         open={formOpen}
         loading={createLoading || updateLoading || editDetailsLoading}
         // Only provide editPlan when actually editing. When creating, always null.
@@ -175,6 +195,7 @@ const BusinessAndMindSetPlan: React.FC = () => {
           await createBusinessAndMindsetPlan(v).unwrap();
           message.success("Plan added");
           setFormOpen(false);
+          setEditItem(null);
           refetch();
         }}
         onUpdate={async (id, v) => {
@@ -245,7 +266,6 @@ const BusinessAndMindSetPlan: React.FC = () => {
             icon={<PlusOutlined />}
             style={{ height: 40, borderRadius: 50 }}
             onClick={() => {
-              // When opening for create, ensure editItem is cleared!
               setEditItem(null);
               setFormOpen(true);
             }}
@@ -256,20 +276,20 @@ const BusinessAndMindSetPlan: React.FC = () => {
       </div>
 
       {/* Table */}
-      <Spin spinning={isLoading}>
-        <Table
-          rowKey="_id"
-          style={{ overflowX: "auto", marginTop: 20 }}
-          dataSource={data?.data || []}
-          columns={columns}
-          className={`user-table-custom-gray user-table-gray-row-border`}
-          pagination={pagination}
-          loading={isLoading}
-          scroll={
-            window.innerWidth < 600 ? undefined : { y: `calc(100vh - 320px)` }
-          }
-        />
-      </Spin>
+      <Table
+        rowKey="_id"
+        style={{ overflowX: "auto", marginTop: 20 }}
+        dataSource={data?.data || []}
+        columns={columns}
+        className={`user-table-custom-gray user-table-gray-row-border`}
+        pagination={pagination}
+        loading={isLoading}
+        scroll={
+          typeof window !== "undefined" && window.innerWidth < 600
+            ? undefined
+            : { y: `calc(100vh - 320px)` }
+        }
+      />
     </div>
   );
 };

@@ -10,8 +10,8 @@ import {
   Space,
   Select,
 } from "antd";
-import { useEffect, useState } from "react";
-import Editor from "react-simple-wysiwyg";
+import { useEffect, useRef, useState, useMemo } from "react";
+import JoditEditor from "jodit-react";
 import {
   UploadOutlined,
   InboxOutlined,
@@ -19,7 +19,6 @@ import {
   DeleteOutlined,
   EyeOutlined,
 } from "@ant-design/icons";
-import "react-quill/dist/quill.snow.css";
 import type { UploadFile } from "antd";
 import { imageUrl } from "../../../redux/api/baseApi";
 import { useGetMealCategoriesQuery } from "../../../redux/apiSlices/mealCategorySlice";
@@ -47,147 +46,201 @@ export const MealCreateModal: React.FC<{
   onClose: () => void;
   onAdd: (values: FormData) => Promise<void>;
   onUpdate: (id: string, values: FormData) => Promise<void>;
-}> = ({ open, loading, editMeal, onClose, onAdd, onUpdate }) => {
+}> = ({
+  open,
+  loading,
+  editMeal,
+  onClose,
+  onAdd,
+  onUpdate,
+}) => {
   const [form] = Form.useForm();
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [imagePreview, setImagePreview] = useState<string>("");
   const [fileList, setFileList] = useState<UploadFile[]>([]);
-  const [descError, setDescError] = useState<string>("");
+  const [imageError, setImageError] = useState<string>("");
 
-  // For dropdown pagination, handy if many categories (not included UX here)
-  const [categoryLimit] = useState(100);
-  const [categoryPage] = useState(1);
-
-  const query = {
-    page: categoryPage,
-    limit: categoryLimit,
-  };
-
+  const query = { page: 1, limit: 100 };
   const { data: catData } = useGetMealCategoriesQuery({ query });
 
-  const [html, setHtml] = useState<string>("");
+  // --- Description/Editor logic using pattern like PrivacyPolicy ---
+  const editorRef = useRef<any>(null);
+  // Store the description HTML string by ref; initial value must sync with editMeal dynamically
+  const editorContentRef = useRef<string>("");
 
-  function onChange(e: React.ChangeEvent<HTMLTextAreaElement> | string) {
-    if (typeof e === "string") {
-      setHtml(e);
-    } else {
-      setHtml(e.target.value);
-    }
-  }
-
-  // Handles both string and object format for mealCategory from editMeal
+  // When editMeal or open changes, set form fields and image states with latest values
   useEffect(() => {
-    if (editMeal) {
-      let catId = "";
-      if (typeof editMeal.mealCategory === "object" && editMeal.mealCategory?._id) {
-        catId = editMeal.mealCategory._id;
-      } else if (typeof editMeal.mealCategory === "string") {
-        catId = editMeal.mealCategory;
-      }
+    if (editMeal && open) {
+      // Adapt _id for category option
+      const categoryId =
+        typeof editMeal.mealCategory === "string"
+          ? editMeal.mealCategory
+          : (editMeal.mealCategory as any)._id;
       form.setFieldsValue({
-        mealCategory: catId || undefined,
+        mealCategory: categoryId,
         name: editMeal.name,
       });
-      setHtml(editMeal.description || "");
-      setImageFile(null);
-      setFileList([]);
-      setImagePreview(editMeal.image ? `${imageUrl}/${editMeal.image}` : "");
-    } else {
-      form.resetFields();
-      setHtml("");
-      setImageFile(null);
-      setFileList([]);
-      setImagePreview("");
-    }
-    setDescError("");
-  }, [editMeal, form, open]);
 
+      // Image preview: from meal image path
+      if (editMeal.image) {
+        setImagePreview(`${imageUrl}/${editMeal.image}`);
+        setImageFile(null);
+        setFileList([]); // keep upload empty, just preview original
+        setImageError("");
+      } else {
+        setImagePreview("");
+        setImageFile(null);
+        setFileList([]);
+        setImageError("");
+      }
+
+      // Description
+      editorContentRef.current = editMeal.description || "";
+      setTimeout(() => {
+        try {
+          if (editorRef.current?.editor) {
+            editorRef.current.editor.value = editMeal.description || "";
+          }
+        } catch {}
+      }, 0);
+    } else if (open && !editMeal) {
+      // Create mode: clear everything
+      form.resetFields();
+      setImagePreview("");
+      setImageFile(null);
+      setFileList([]);
+      setImageError("");
+      editorContentRef.current = "";
+      setTimeout(() => {
+        try {
+          if (editorRef.current?.editor) {
+            editorRef.current.editor.value = "";
+          }
+        } catch {}
+      }, 0);
+    }
+    // Clean up on close: (no-op)
+  }, [editMeal, open, form]);
+
+  // Jodit config
+  const isMobile = typeof window !== "undefined" && window.innerWidth <= 600;
+  const editorHeight = isMobile ? 240 : 240;
+  const joditConfig = useMemo(
+    () => ({
+      placeholder: "Write description...",
+      toolbarAdaptive: false,
+      buttons:
+        "paragraph,bold,italic,ul,ol,font,fontsize,lineHeight,align,table,brush",
+      height: editorHeight,
+      style: {
+        background: "#131313",
+        color: "#fff",
+        minHeight: editorHeight,
+      },
+      readonly: false,
+      theme: "default",
+      minHeight: editorHeight,
+      toolbarSticky: false,
+      allowResizeY: false,
+      spellcheck: true,
+      statusbar: false,
+      uploader: { insertImageAsBase64URI: false },
+    }),
+    [editorHeight]
+  );
+
+  // Image handling
   const handleImageChange = (info: any) => {
     const { file, fileList: newFileList } = info;
     setFileList(newFileList.slice(-1));
-
     if (file.status !== "removed") {
       const originFile = file.originFileObj || file;
-
-      const isImage = originFile.type && originFile.type.startsWith("image/");
-      if (!isImage) {
+      if (!originFile.type.startsWith("image/")) {
         message.error("Please upload a valid image file!");
+        setImageError("Please upload a valid image file!");
         setFileList([]);
+        setImageFile(null);
+        setImagePreview(editMeal?.image ? `${imageUrl}/${editMeal?.image}` : "");
         return;
       }
-
-      const isLt5M = originFile.size / 1024 / 1024 < 5;
-      if (!isLt5M) {
+      if (originFile.size / 1024 / 1024 > 5) {
         message.error("Image must be smaller than 5MB!");
+        setImageError("Image must be smaller than 5MB!");
         setFileList([]);
+        setImageFile(null);
+        setImagePreview(editMeal?.image ? `${imageUrl}/${editMeal?.image}` : "");
         return;
       }
-
       setImageFile(originFile);
-
+      setImageError("");
       const reader = new FileReader();
-      reader.onloadend = () => {
-        setImagePreview(reader.result as string);
-      };
+      reader.onloadend = () => setImagePreview(reader.result as string);
       reader.readAsDataURL(originFile);
       message.success("Image uploaded successfully!");
-    } else {
-      handleImageRemove();
-    }
+    } else handleImageRemove();
   };
 
   const handleImageRemove = () => {
     setImageFile(null);
     setFileList([]);
     setImagePreview(editMeal?.image ? `${imageUrl}/${editMeal?.image}` : "");
+    setImageError("Image is required");
     message.info("Image removed");
   };
 
+  // Submit
   const handleSubmit = async () => {
     try {
       const values = await form.validateFields();
 
-      // Remove html tags for checking
-      const cleanDesc = html.replace(/<[^>]*>/g, "").trim();
-      if (!cleanDesc) {
-        setDescError("Please enter description");
-        return;
+      // Get description from ref; fallback to initial value if not found
+      let descriptionValue = editorContentRef.current;
+      if (!descriptionValue || typeof descriptionValue !== "string") {
+        descriptionValue = "";
       }
-      setDescError("");
+
+      // Image required check
+      const needsImage = !imageFile && !imagePreview;
+      if (needsImage) {
+        setImageError("Image is required");
+        return;
+      } else setImageError("");
 
       const formData = new FormData();
       formData.append("mealCategory", values.mealCategory);
       formData.append("name", values.name);
-      formData.append("description", html);
+      formData.append("description", descriptionValue);
 
-      if (imageFile) {
-        formData.append("image", imageFile);
-      } else if (!editMeal) {
-        formData.append("image", "");
-      }
+      if (imageFile) formData.append("image", imageFile);
 
-      if (editMeal) {
-        await onUpdate(editMeal._id, formData);
-      } else {
-        await onAdd(formData);
-      }
+      if (editMeal) await onUpdate(editMeal._id, formData);
+      else await onAdd(formData);
 
       form.resetFields();
-      setHtml("");
       setImageFile(null);
       setFileList([]);
       setImagePreview("");
-      setDescError("");
+      setImageError("");
+      // Reset editor description on new entry/close
+      editorContentRef.current = "";
+      setTimeout(() => {
+        try {
+          if (editorRef.current?.editor) {
+            editorRef.current.editor.value = "";
+          }
+        } catch {}
+      }, 0);
     } catch (err) {
       console.error(err);
     }
   };
 
+  // Main JSX
   return (
     <Modal
       open={open}
       title={
-        <div style={{ fontSize: 18, fontWeight: 600, color: "#fff" }}>
+        <div style={{ fontSize: 19, fontWeight: 700, color: "#fff" }}>
           {editMeal ? "Edit Meal" : "Create New Meal"}
         </div>
       }
@@ -196,22 +249,20 @@ export const MealCreateModal: React.FC<{
       confirmLoading={loading}
       okText={editMeal ? "Update Meal" : "Create Meal"}
       cancelText="Cancel"
-      width={850}
+      width={900}
       destroyOnClose
-      styles={{
-        body: { paddingTop: 24 },
-      }}
+      bodyStyle={{ padding: 32, background: "#181818" }}
     >
       <Form form={form} layout="vertical" size="large">
-        {/* Meal Category Selector */}
+        {/* Meal Category */}
         <Form.Item
           label={
-            <span style={{ fontSize: 14, fontWeight: 500 }}>Meal Category</span>
+            <span style={{ fontSize: 14, fontWeight: 600, color: "#fff" }}>
+              Meal Category
+            </span>
           }
           name="mealCategory"
-          rules={[
-            { required: true, message: "Please select meal category" },
-          ]}
+          rules={[{ required: true, message: "Please select meal category" }]}
         >
           <Select
             placeholder="Select meal category"
@@ -221,25 +272,25 @@ export const MealCreateModal: React.FC<{
                 .toLowerCase()
                 .includes(input.toLowerCase())
             }
-            style={{ borderRadius: 8, fontSize: 15,background:'black' }}
             optionFilterProp="children"
             loading={!catData}
             disabled={!catData}
+            dropdownStyle={{ background: "#232323", color: "#fff" }}
           >
-            {catData &&
-              Array.isArray(catData?.data) &&
-              catData.data.map((cat: MealCategory) => (
-                <Option key={cat._id} value={cat._id}>
-                  {cat.title}
-                </Option>
-              ))}
+            {catData?.data?.map((cat: MealCategory) => (
+              <Option key={cat._id} value={cat._id} style={{ color: "#fff" }}>
+                {cat.title}
+              </Option>
+            ))}
           </Select>
         </Form.Item>
 
-        {/* Name Input */}
+        {/* Meal Name */}
         <Form.Item
           label={
-            <span style={{ fontSize: 14, fontWeight: 500 }}>Name</span>
+            <span style={{ fontSize: 14, fontWeight: 600, color: "#fff" }}>
+              Name
+            </span>
           }
           name="name"
           rules={[
@@ -248,20 +299,19 @@ export const MealCreateModal: React.FC<{
             { max: 100, message: "Meal name must be less than 100 characters" },
           ]}
         >
-          <Input
-            placeholder="Enter meal name"
-            style={{
-              borderRadius: 8,
-              fontSize: 15,
-            }}
-          />
+          <Input placeholder="Enter meal name" />
         </Form.Item>
 
         {/* Image Upload Section */}
         <Form.Item
+          required
           label={
-            <span style={{ fontSize: 14, fontWeight: 500 }}>Image</span>
+            <span style={{ fontSize: 14, fontWeight: 600, color: "#fff" }}>
+              Image
+            </span>
           }
+          validateStatus={imageError ? "error" : ""}
+          help={imageError && <span style={{ color: "#ff4d4f" }}>{imageError}</span>}
         >
           {!imagePreview ? (
             <Dragger
@@ -274,119 +324,98 @@ export const MealCreateModal: React.FC<{
               fileList={fileList}
               showUploadList={false}
               style={{
-                borderRadius: 12,
-                border: "2px dashed #d9d9d9",
-                transition: "all 0.3s",
-                height: 200,
+                borderRadius: 15,
+                border: imageError
+                  ? "2px solid #ff4d4f"
+                  : "2px dashed #333",
+                height: 210,
                 display: "flex",
                 alignItems: "center",
                 justifyContent: "center",
+                background: "#151515",
               }}
             >
-              <div style={{ width: "100%", padding: 0, margin: 0 }}>
-                <div
+              <div style={{ textAlign: "center" }}>
+                <InboxOutlined
+                  style={{ fontSize: 58, color: "#23aaff" }}
+                />
+                <p
                   style={{
-                    display: "flex",
-                    height: 200,
-                    alignItems: "center",
-                    justifyContent: "center",
+                    fontSize: 17,
+                    fontWeight: 600,
+                    color: "#e8e8e8",
+                    marginBottom: 6,
                   }}
                 >
-                  <div>
-                    <p
-                      className="ant-upload-drag-icon"
-                      style={{ textAlign: "center" }}
-                    >
-                      <InboxOutlined style={{ fontSize: 56, color: "#1890ff" }} />
-                    </p>
-                    <p
-                      style={{
-                        fontSize: 16,
-                        fontWeight: 500,
-                        color: "#fff",
-                        marginBottom: 8,
-                        textAlign: "center",
-                      }}
-                    >
-                      Click or drag image to upload
-                    </p>
-                    <p
-                      style={{
-                        fontSize: 13,
-                        color: "#fff",
-                        margin: 0,
-                        textAlign: "center",
-                      }}
-                    >
-                      Support: JPG, PNG, WEBP • Max size: 5MB
-                    </p>
-                  </div>
-                </div>
+                  Click or drag image to upload
+                </p>
+                <p
+                  style={{
+                    fontSize: 13,
+                    color: "#ababab",
+                    margin: 0,
+                  }}
+                >
+                  Support: JPG, PNG, WEBP • Max size: 5MB
+                </p>
               </div>
             </Dragger>
           ) : (
             <Card
               bordered={false}
               style={{
-                borderRadius: 12,
-                background: "black",
-                height: 200,
+                borderRadius: 15,
+                background: "#141414",
+                height: 210,
                 display: "flex",
                 alignItems: "stretch",
+                boxShadow: "0px 1.5px 16px #00000014",
+                border: imageError
+                  ? "2px solid #ff4d4f"
+                  : "1.5px solid #232323",
               }}
-              bodyStyle={{
-                height: "100%",
-                padding: 0,
-              }}
+              bodyStyle={{ height: "100%", padding: 0 }}
             >
               <div
                 style={{
                   display: "flex",
-                  gap: 20,
+                  gap: 22,
                   alignItems: "flex-start",
                   height: "100%",
                 }}
               >
                 {/* Image Preview */}
-                <div style={{ flex: "0 0 280px", height: "100%" }}>
-                  <div
+                <div style={{ flex: "0 0 276px", height: "100%" }}>
+                  <Image
+                    src={imagePreview}
+                    alt="Preview"
                     style={{
-                      position: "relative",
-                      borderRadius: 10,
-                      overflow: "hidden",
-                      height: "100%",
+                      width: "100%",
+                      height: 210,
+                      objectFit: "contain",
+                      borderTopLeftRadius: 15,
+                      borderBottomLeftRadius: 15,
+                      background: "#141414",
                     }}
-                  >
-                    <Image
-                      src={imagePreview}
-                      alt="Preview"
-                      style={{
-                        width: "100%",
-                        height: 200,
-                        objectFit: "contain",
-                        borderTopRightRadius: 10,
-                        borderBottomRightRadius: 10,
-                        background: "black",
-                      }}
-                      preview={{
-                        mask: (
-                          <div
-                            style={{
-                              display: "flex",
-                              alignItems: "center",
-                              gap: 6,
-                              fontSize: 14,
-                            }}
-                          >
-                            <EyeOutlined /> Preview
-                          </div>
-                        ),
-                      }}
-                    />
-                  </div>
+                    preview={{
+                      mask: (
+                        <div
+                          style={{
+                            display: "flex",
+                            alignItems: "center",
+                            gap: 6,
+                            fontSize: 15,
+                            color: "#fff",
+                          }}
+                        >
+                          <EyeOutlined /> Preview
+                        </div>
+                      ),
+                    }}
+                  />
                 </div>
 
-                {/* Image Info & Actions */}
+                {/* Image Actions */}
                 <div
                   style={{
                     flex: 1,
@@ -396,15 +425,15 @@ export const MealCreateModal: React.FC<{
                     justifyContent: "center",
                   }}
                 >
-                  <Space direction="vertical" size={16} style={{ width: "100%" }}>
+                  <Space direction="vertical" size={18} style={{ width: "100%" }}>
                     {imageFile && (
                       <div>
                         <div
                           style={{
                             fontSize: 13,
                             color: "#fff",
-                            marginBottom: 8,
-                            fontWeight: 500,
+                            marginBottom: 10,
+                            fontWeight: 600,
                           }}
                         >
                           File Details:
@@ -412,15 +441,16 @@ export const MealCreateModal: React.FC<{
                         <div
                           style={{
                             color: "#fff",
-                            padding: "12px 16px",
-                            borderRadius: 8,
-                            border: "1px solid #e8e8e8",
-                            fontSize: 13,
+                            padding: "13px 17px",
+                            borderRadius: 9,
+                            border: "1.5px solid #282828",
+                            fontSize: 14,
+                            background: "#191919",
                           }}
                         >
-                          <div style={{ marginBottom: 6 }}>
+                          <div style={{ marginBottom: 7 }}>
                             <FileImageOutlined
-                              style={{ marginRight: 8, color: "#1890ff" }}
+                              style={{ marginRight: 10, color: "#23aaff" }}
                             />
                             <strong>Name:</strong> {imageFile.name}
                           </div>
@@ -431,8 +461,7 @@ export const MealCreateModal: React.FC<{
                         </div>
                       </div>
                     )}
-
-                    <Space size={8}>
+                    <Space size={10}>
                       <Upload
                         beforeUpload={() => false}
                         maxCount={1}
@@ -442,17 +471,30 @@ export const MealCreateModal: React.FC<{
                       >
                         <Button
                           icon={<UploadOutlined />}
-                          style={{ borderRadius: 6 }}
+                          style={{
+                            borderRadius: 7,
+                            background: "#212c3a",
+                            color: "#fff",
+                            border: "1.5px solid #23aaff",
+                            fontWeight: 600,
+                            height: 38,
+                          }}
                         >
                           Change Image
                         </Button>
                       </Upload>
-
                       <Button
                         danger
                         icon={<DeleteOutlined />}
                         onClick={handleImageRemove}
-                        style={{ borderRadius: 6 }}
+                        style={{
+                          borderRadius: 7,
+                          background: "#20191a",
+                          border: "none",
+                          color: "#ff7171",
+                          fontWeight: 600,
+                          height: 38,
+                        }}
                       >
                         Remove
                       </Button>
@@ -467,35 +509,29 @@ export const MealCreateModal: React.FC<{
         {/* Description Editor */}
         <Form.Item
           label={
-            <span style={{ fontSize: 14, fontWeight: 500 }}>Description</span>
-          }
-          required
-          validateStatus={descError ? "error" : ""}
-          help={
-            descError && (
-              <span style={{ color: "#ff4d4f" }}>{descError}</span>
-            )
+            <span style={{ fontSize: 14, fontWeight: 600, color: "#fff" }}>
+              Description
+            </span>
           }
         >
           <div
             style={{
-              border: descError ? "2px solid #ff4d4f" : "1px solid #d9d9d9",
-              borderRadius: 8,
+              border: "1.5px solid #242424",
+              borderRadius: 13,
               overflow: "hidden",
               transition: "all 0.3s",
+              background: "#131313",
             }}
           >
-            <Editor
-              value={html}
-              onChange={(event) => onChange(event.target.value)}
-              aria-multiline
-              color="red"
-              style={{ color: "#fff", minHeight: 200, height: 200 }}
-              placeholder="Write Description"
+            <JoditEditor
+              ref={editorRef}
+              value={editorContentRef.current}
+              config={joditConfig as any}
+              tabIndex={1}
+              onChange={(newContent: string) => {
+                editorContentRef.current = newContent || "";
+              }}
             />
-          </div>
-          <div style={{ marginTop: 8, fontSize: 12, color: "#8c8c8c" }}>
-            💡 Tip: Use formatting tools to make your description more readable
           </div>
         </Form.Item>
       </Form>

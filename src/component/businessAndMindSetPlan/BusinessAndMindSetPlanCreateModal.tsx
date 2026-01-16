@@ -3,8 +3,8 @@ import {
   Input,
   Modal
 } from "antd";
-import { useEffect, useState } from "react";
-import Editor from "react-simple-wysiwyg";
+import { useEffect, useRef, useMemo, useState } from "react";
+import JoditEditor from "jodit-react";
 
 type BusinessAndMindSetPlan = {
   _id: string;
@@ -31,7 +31,39 @@ export const GymAndFitnessPlanCreateModal: React.FC<{
 }> = ({ open, loading, editPlan, onClose, onAdd, onUpdate }) => {
   const [form] = Form.useForm();
   const [descError, setDescError] = useState<string>("");
-  const [html, setHtml] = useState<string>("");
+  // Use useRef for editor content (same as GymAndFitness)
+  const editorContentRef = useRef<string>(editPlan?.description || "");
+
+  // Jodit Editor logic
+  const editor = useRef(null);
+  const isMobile = typeof window !== "undefined" && window.innerWidth <= 600;
+  const editorHeight = isMobile ? 200 : 300;
+
+  const joditConfig = useMemo(
+    () => ({
+      readonly: false,
+    height: 240, // higher for more space, matches "BusinessAndMindSetPlanCreateModal"
+    minHeight: 240,
+    theme: "default",
+    buttons:
+    "undo,redo,|," +
+    "font,fontsize,|," +
+    "brush,|," +
+    "bold,italic,underline,strikethrough,|," +
+    "ul,ol,|," +
+    "lineHeight,|," ,
+    placeholder: "Write Description",
+    toolbarAdaptive: false,
+    style: { background: "#131313", color: "#fff", minHeight: 240 },
+    toolbarSticky: false,
+    allowResizeY: false,
+    spellcheck: true,
+    statusbar: false,
+    // Custom CSS for the editor (matches high-contrast look of Biz modal)
+    uploader: { insertImageAsBase64URI: false },
+    }),
+    [editorHeight]
+  );
 
   // Populate fields from editPlan directly if editing, else clear fields
   useEffect(() => {
@@ -40,30 +72,26 @@ export const GymAndFitnessPlanCreateModal: React.FC<{
         form.setFieldsValue({
           title: editPlan.title,
         });
-        setHtml(editPlan.description || "");
+        editorContentRef.current = editPlan.description || "";
         setDescError("");
       } else {
         form.resetFields();
-        setHtml("");
+        editorContentRef.current = "";
         setDescError("");
       }
     }
     // eslint-disable-next-line
   }, [open, editPlan, form]);
 
-  // Correct e typing
-  function onChange(e: React.ChangeEvent<HTMLTextAreaElement> | string) {
-    if (typeof e === "string") {
-      setHtml(e);
-    } else {
-      setHtml(e.target.value);
-    }
-  }
+  const handleEditorChange = (newContent: string) => {
+    editorContentRef.current = newContent;
+  };
 
   const handleSubmit = async () => {
     try {
       const values = await form.validateFields();
-      const cleanDesc = html.replace(/<[^>]*>/g, "").trim();
+      // Remove html tags for requiredness
+      const cleanDesc = (editorContentRef.current || "").replace(/<[^>]*>/g, "").trim();
       if (!cleanDesc) {
         setDescError("Please enter plan description");
         return;
@@ -72,7 +100,7 @@ export const GymAndFitnessPlanCreateModal: React.FC<{
 
       const body: BusinessAndMindSetPlanBody = {
         title: values.title,
-        description: html
+        description: editorContentRef.current || ""
       };
 
       if (editPlan) {
@@ -82,7 +110,7 @@ export const GymAndFitnessPlanCreateModal: React.FC<{
       }
 
       form.resetFields();
-      setHtml("");
+      editorContentRef.current = "";
       setDescError("");
     } catch (err) {
       console.error(err);
@@ -104,7 +132,7 @@ export const GymAndFitnessPlanCreateModal: React.FC<{
       confirmLoading={loading}
       okText={editPlan ? "Update Plan" : "Create Plan"}
       cancelText="Cancel"
-      width={600}
+      width={700}
       destroyOnClose
       styles={{
         body: { paddingTop: 24 },
@@ -136,7 +164,7 @@ export const GymAndFitnessPlanCreateModal: React.FC<{
         <Form.Item
           label={
             <span style={{ fontSize: 14, fontWeight: 500 }}>
-               Description
+                Description
             </span>
           }
           required
@@ -151,19 +179,16 @@ export const GymAndFitnessPlanCreateModal: React.FC<{
               borderRadius: 8,
               overflow: "hidden",
               transition: "all 0.3s",
+              background: "#181c1f",
             }}
           >
-            <Editor
-              value={html}
-              onChange={(event) => onChange(event.target.value)}
-              aria-multiline
-              color="red"
-              style={{ color: "#fff", minHeight: 200, height: 200 }}
-              placeholder="Write Description"
+            <JoditEditor
+              ref={editor}
+              value={editorContentRef.current}
+              config={joditConfig as any}
+              tabIndex={1}
+              onChange={handleEditorChange}
             />
-          </div>
-          <div style={{ marginTop: 8, fontSize: 12, color: "#8c8c8c" }}>
-            💡 Tip: Use formatting tools to make your description more readable
           </div>
         </Form.Item>
       </Form>
