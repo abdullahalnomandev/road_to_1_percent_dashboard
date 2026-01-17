@@ -141,7 +141,7 @@ export const MealCreateModal: React.FC<{
       theme: "default",
       minHeight: editorHeight,
       toolbarSticky: false,
-      allowResizeY: false,
+      allowResizeY: true,
       spellcheck: true,
       statusbar: false,
       uploader: { insertImageAsBase64URI: false },

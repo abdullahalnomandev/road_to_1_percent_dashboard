@@ -73,7 +73,7 @@ export const GymAndFitnessPlanCreateModal: React.FC<{
       toolbarAdaptive: false,
       style: { background: "#131313", color: "#fff", minHeight: 240 },
       toolbarSticky: false,
-      allowResizeY: false,
+      allowResizeY: true,
       spellcheck: true,
       statusbar: false,
       // Custom CSS for the editor (matches high-contrast look of Biz modal)
