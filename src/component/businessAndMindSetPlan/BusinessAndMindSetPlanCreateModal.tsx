@@ -1,6 +1,7 @@
 import {
   Form,
   Input,
+  message,
   Modal
 } from "antd";
 import { useEffect, useRef, useMemo, useState } from "react";
@@ -94,6 +95,7 @@ export const GymAndFitnessPlanCreateModal: React.FC<{
       const cleanDesc = (editorContentRef.current || "").replace(/<[^>]*>/g, "").trim();
       if (!cleanDesc) {
         setDescError("Please enter plan description");
+        message.error("Please enter plan description");
         return;
       }
       setDescError("");
@@ -112,7 +114,31 @@ export const GymAndFitnessPlanCreateModal: React.FC<{
       form.resetFields();
       editorContentRef.current = "";
       setDescError("");
-    } catch (err) {
+    } catch (err: any) {
+      // Try to show error message from the db response if available
+      let dbMsg = err?.data?.message || err?.message || err?.error;
+      // If error message contains "The value of \"offset\" is out of range.", convert numbers to MB/KB and make human readable
+      if (typeof dbMsg === "string" && dbMsg.includes('The value of "offset" is out of range')) {
+        // Extract Received and max values
+        const receivedMatch = dbMsg.match(/Received (\d+)/);
+        const maxMatch = dbMsg.match(/<= (\d+)/);
+        const received = receivedMatch ? parseInt(receivedMatch[1], 10) : null;
+        const max = maxMatch ? parseInt(maxMatch[1], 10) : null;
+        // Function to format size
+        const fmt = (n: number) => {
+          if (n >= 1024 * 1024) return (n / (1024 * 1024)).toFixed(2) + " MB";
+          if (n >= 1024) return (n / 1024).toFixed(2) + " KB";
+          return n + " B";
+        };
+        if (received !== null && max !== null) {
+          dbMsg = `The value of "offset" is out of range. Allowed range is 0 to ${fmt(max)}. Received ${fmt(received)}.`;
+        }
+      }
+      if (dbMsg) {
+        message.error(dbMsg);
+      } else {
+        message.error("Failed to submit. Please check the form.");
+      }
       console.error(err);
     }
   };
@@ -167,7 +193,6 @@ export const GymAndFitnessPlanCreateModal: React.FC<{
                 Description
             </span>
           }
-          required
           validateStatus={descError ? "error" : ""}
           help={
             descError && <span style={{ color: "#ff4d4f" }}>{descError}</span>
