@@ -7,6 +7,7 @@ import { MENU_CONFIG } from "../constant/sidebarMenue";
 import ProfilePage from "../pages/profile";
 import NotificationPage from "../pages/notificationPage";
 import ResetPassword from "../component/resetPassword";
+import DeleteAccountPage from "../pages/delete-account";
 
 // Dynamically create children routes from MENU_CONFIG, skipping dashboard ("/")
 const dynamicChildren = MENU_CONFIG.filter(item => item.path !== "/").map(item => ({
@@ -18,6 +19,10 @@ export const router = createBrowserRouter([
   {
     path: "/login",
     element: <LoginPage />,
+  },
+  {
+    path: "/delete-account",
+    element: <DeleteAccountPage />,
   },
   {
     path: "/forget-password",

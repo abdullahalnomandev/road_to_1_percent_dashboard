@@ -60,6 +60,13 @@ const authSlice = api.injectEndpoints({
                 }
             }
         }),
+        deleteUser: builder.mutation({
+            query: (data) => ({
+                method: "DELETE",
+                url: "/user/delete-account",
+                body: data,
+            })
+        }),
 
         profile: builder.query({
             query: () => {
@@ -79,4 +86,5 @@ export const {
     useChangePasswordMutation,
     useUpdateProfileMutation,
     useProfileQuery,
+    useDeleteUserMutation
 } = authSlice;
