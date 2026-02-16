@@ -318,7 +318,7 @@ export const MealCreateModal: React.FC<{
               name="image"
               multiple={false}
               maxCount={1}
-              accept="image/png,image/jpeg,image/jpg,image/webp"
+              accept="image/jpeg,image/png,image/jpg"
               beforeUpload={() => false}
               onChange={handleImageChange}
               fileList={fileList}
@@ -356,7 +356,7 @@ export const MealCreateModal: React.FC<{
                     margin: 0,
                   }}
                 >
-                  Support: JPG, PNG, WEBP • Max size: 5MB
+                  Support: JPG, PNG • Max size: 5MB
                 </p>
               </div>
             </Dragger>
