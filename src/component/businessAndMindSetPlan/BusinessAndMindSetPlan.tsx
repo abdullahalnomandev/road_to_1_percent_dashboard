@@ -1,11 +1,12 @@
-import { Modal } from "antd";
+import { Modal, Skeleton } from "antd";
 import type { BusinessAndMindSetPlan } from ".";
 
 export const GymAndFitnessPlanInfoModal: React.FC<{
   plan: BusinessAndMindSetPlan | null;
   open: boolean;
   onClose: () => void;
-}> = ({ plan, open, onClose }) => {
+  loading?: boolean;
+}> = ({ plan, open, onClose, loading = false }) => {
 
   return (
     <Modal
@@ -22,7 +23,11 @@ export const GymAndFitnessPlanInfoModal: React.FC<{
         },
       }}
     >
-      {plan && (
+      {loading ? (
+        <div style={{ padding: "28px 32px 20px 32px" }}>
+          <Skeleton active paragraph={{ rows: 3 }} title={{ width: "60%" }} />
+        </div>
+      ) : plan ? (
         <div style={{ padding: 0 }}>
           {/* Info Section */}
           <div style={{ padding: "28px 32px 20px 32px" }}>
@@ -55,7 +60,7 @@ export const GymAndFitnessPlanInfoModal: React.FC<{
             </div>
           </div>
         </div>
-      )}
+      ) : null}
     </Modal>
   );
 };

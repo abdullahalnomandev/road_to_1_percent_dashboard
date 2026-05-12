@@ -57,13 +57,6 @@ const BusinessAndMindSetPlan: React.FC = () => {
   const [updateBusinessAndMindsetPlan, { isLoading: updateLoading }] = useUpdateBusinessAndMindsetPlanMutation();
   const [deleteBusinessAndMindsetPlan, { isLoading: deleteLoading }] = useDeleteBusinessAndMindsetPlanMutation();
 
-  // View details fetch
-  const { data: details } = useGetBusinessAndMindsetPlanDetailsQuery(
-    viewOpen && viewItem?._id ? viewItem._id : "",
-    {
-      skip: !viewOpen || !viewItem,
-    }
-  );
 
   // Edit details fetch: always use the latest editItem id only when opening the modal
   const {
@@ -114,7 +107,6 @@ const BusinessAndMindSetPlan: React.FC = () => {
                 onClick={() => {
                   setViewItem(record);
                   setViewOpen(true);
-                  refetch();
                 }}
               >
                 <EyeOutlined />
@@ -174,11 +166,12 @@ const BusinessAndMindSetPlan: React.FC = () => {
       {/* Modals */}
       <GymAndFitnessPlanInfoModal
         open={viewOpen}
-        plan={details?.data || null}
+        plan={viewItem}
         onClose={() => {
           setViewOpen(false);
           setViewItem(null);
           setEditItem(null);
+          prevEditIdRef.current = null;
         }}
       />
       <GymAndFitnessPlanCreateModal
@@ -190,6 +183,7 @@ const BusinessAndMindSetPlan: React.FC = () => {
         onClose={() => {
           setFormOpen(false);
           setEditItem(null);
+          prevEditIdRef.current = null;
         }}
         onAdd={async (v) => {
           await createBusinessAndMindsetPlan(v).unwrap();
